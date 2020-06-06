@@ -23,3 +23,7 @@ Wireshark dissector of MySQL Group Replication
 	- Mac OS X: `{build_dir}/run/Wireshark.app/Contents/PlugIns/wireshark/3-3/epan/mysql_group_replication.so`
 5. copy the plugin to your setup directory
 	- Mac OS X: `/Application/Wireshark.app/Contents/PlugIns/wireshark/3-3/epan/mysql_group_replication.so`
+	
+# Snapshot
+
+![snapshot](https://github.com/actiontech/wireshark-dissector-mysql-group-replicaiton/blob/master/mgr_plugin_snapshot.png)
