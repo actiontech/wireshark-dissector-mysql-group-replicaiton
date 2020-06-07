@@ -8,21 +8,30 @@ Wireshark dissector of MySQL Group Replication
 
 # HOW-TO use
 
-1. For Windows and Linux, follow the "HOW-TO compile" section
+1. For Windows and Linux, follow the "HOW-TO compile" section. **PR on release app are welcome**
 2. For Mac OSX:
-	- download the plugin under "Release" section
-	- copy the plugin to the setup directory, for example: `/Application/Wireshark.app/Contents/PlugIns/wireshark/3-3/epan/mysql_group_replication.so`
+	- Download the wireshark app under "Release" section
+	- Install
+	- Read the "Snapshot" section
 
 # HOW-TO compile
 
 1. git clone https://github.com/wireshark/wireshark.git
-2. copy src/* to wireshark/plugins/epan/mysql_group_replication
-3. compile Wireshark, following the offical documents:
+2. copy src/* to {wireshark_src}/plugins/epan/mysql_group_replication
+3. copy CMakeListsCustom.txt to {wireshark_src}/CMakeListsCustom.txt
+4. compile Wireshark, following the offical documents:
 	* https://www.wireshark.org/docs/wsdg_html_chunked/ChSrcBuildFirstTime.html
-4. the plugin dist is at {build_dir}/run/... 
-	- Mac OS X: `{build_dir}/run/Wireshark.app/Contents/PlugIns/wireshark/3-3/epan/mysql_group_replication.so`
-5. copy the plugin to your setup directory
-	- Mac OS X: `/Application/Wireshark.app/Contents/PlugIns/wireshark/3-3/epan/mysql_group_replication.so`
+5. package Wireshark, foolowing the offical documents:
+	* https://www.wireshark.org/docs/wsdg_html_chunked/ChSrcBinary.html
+6. the Wireshark package will be at {build_dir}/run/
+
+# WHY provides Wireshark app instead of Plugin files
+
+Plugin files should be provides by (OS version + Wireshark version), which is too complicated to handle.
+
+An all-in-one Wireshark app is much easier for users.
+
+Again, **PR on Windows/Linux/Mac OSX 10.14 are warmly welcome**
 	
 # Snapshot
 
