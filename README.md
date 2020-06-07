@@ -26,4 +26,6 @@ Wireshark dissector of MySQL Group Replication
 	
 # Snapshot
 
+![snapshot-1](https://github.com/actiontech/wireshark-dissector-mysql-group-replicaiton/blob/master/mgr_plugin_snapshot-1.png)
+
 ![snapshot](https://github.com/actiontech/wireshark-dissector-mysql-group-replicaiton/blob/master/mgr_plugin_snapshot.png)
