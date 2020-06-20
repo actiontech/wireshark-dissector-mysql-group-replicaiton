@@ -1,4 +1,4 @@
-#define MGR_DEFAULT_PORT (4406)
+#define MGR_DEFAULT_PORT (33061)
 #define MGR_FRAME_HEADER_LEN (4+4+1+2+1)
 #define BYTES_PER_XDR_UNIT (4)
 
@@ -118,6 +118,31 @@ static int hf_gcs_snap_configs_nodes_min_proto = -1;
 static int hf_gcs_snap_configs_nodes_max_proto = -1;
 static gint ett_gcs_snap_configs_nodes = -1;
 static int hf_gcs_snap_app_snap = -1;
+static gint ett_gcs_msg = -1;
+static int hf_gcs_msg_version = -1;
+static int hf_gcs_msg_cargo_type = -1;
+static int hf_TODO = -1;
+static int hf_xcom_member_state_fixed_view_id = -1;
+static int hf_xcom_member_state_monotonic_view_id = -1;
+static int hf_xcom_member_state_group_id = -1;
+static int hf_xcom_member_state_msg_no = -1;
+static int hf_xcom_member_state_node = -1;
+static int hf_xcom_member_state_payload_cargo_type = -1;
+static int hf_group_member_info_member_count = -1;
+static int hf_group_member_info_hostname = -1;
+static int hf_group_member_info_port = -1;
+static int hf_group_member_info_uuid = -1;
+static int hf_group_member_info_gcs_member_id = -1;
+static int hf_group_member_info_status = -1;
+static int hf_group_member_info_member_version = -1;
+static int hf_group_member_info_write_set_extraction_algorithm = -1;
+static int hf_group_member_info_executed_gtid_set = -1;
+static int hf_group_member_info_retrieved_gtid_set = -1;
+static int hf_group_member_info_gtid_assignment_block_size = -1;
+static int hf_group_member_info_role = -1;
+static int hf_group_member_info_configuration_flags = -1;
+static int hf_group_member_info_conflict_detection_enable = -1;
+static int hf_group_member_info_member_weight = -1;
 
 
 static const value_string header_xtype_names[] = {
@@ -216,6 +241,39 @@ static const value_string cargo_type_names[] = {
     {20, "set_cache_limit"}
 };
 
+static const value_string gcs_msg_cargo_type_names[] = {
+    {0, "CT_UNKNOWN"},
+    {1, "CT_INTERNAL_STATE_EXCHANGE"},
+    {2, "CT_USER_DATA"},
+    {3, "CT_MAX"}
+};
+
+static const value_string plugin_gcs_message_cargo_type_names[] = {
+    {0, "CT_UNKNOWN"},
+    {1, "CT_CERTIFICATION_MESSAGE"},
+    {2, "CT_TRANSACTION_MESSAGE"},
+    {3, "CT_RECOVERY_MESSAGE"},
+    {4, "CT_MEMBER_INFO_MESSAGE"},
+    {5, "CT_MEMBER_INFO_MANAGER_MESSAGE"},
+    {6, "CT_PIPELINE_STATS_MEMBER_MESSAGE"},
+    {7, "CT_SINGLE_PRIMARY_MESSAGE"}
+};
+
+static const value_string plugin_gcs_message_member_status_names[] = {
+    {0, "UNKNOWN"},
+    {1, "MEMBER_ONLINE"},
+    {2, "MEMBER_OFFLINE"},
+    {3, "MEMBER_IN_RECOVERY"},
+    {4, "MEMBER_ERROR"},
+    {5, "MEMBER_UNREACHABLE"}
+};
+
+static const value_string plugin_gcs_message_member_role_names[] = {
+    {0, "UNKNOWN"},
+    {1, "MEMBER_ROLE_PRIMARY"},
+    {2, "MEMBER_ROLE_SECONDARY"}
+};
+
 //ett = epan tree type  
 static gint *etts[] = {
     &ett_mgr,
@@ -242,7 +300,8 @@ static gint *etts[] = {
     &ett_gcs_snap_configs,
     &ett_gcs_snap_configs_start,
     &ett_gcs_snap_configs_boot_key,
-    &ett_gcs_snap_configs_nodes
+    &ett_gcs_snap_configs_nodes,
+    &ett_gcs_msg
 };
 
 
@@ -769,5 +828,149 @@ static hf_register_info header_infos[] = {
         FT_UINT_BYTES, BASE_NONE,
         NULL, 0x0,
         NULL, HFILL }
-    }
+    },
+    { &hf_gcs_msg_version,
+        { "gcs_msg.version", "mgr.gcs_msg.version",
+        FT_UINT32, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_gcs_msg_cargo_type,
+        { "gcs_msg.cargo_type", "mgr.gcs_msg.cargo_type",
+        FT_UINT16, BASE_DEC,
+        VALS(gcs_msg_cargo_type_names), 0x0,
+        NULL, HFILL }
+    },
+    { &hf_TODO,
+        { "TODO", "mgr.TODO",
+        FT_UINT32, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_xcom_member_state_fixed_view_id,
+        { "gcs_msg.xcom_member_state.fixed_view_id", "mgr.gcs_msg.xcom_member_state.fixed_view_id",
+        FT_UINT64, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_xcom_member_state_monotonic_view_id,
+        { "gcs_msg.xcom_member_state.monotonic_view_id", "mgr.gcs_msg.xcom_member_state.monotonic_view_id",
+        FT_UINT32, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_xcom_member_state_group_id,
+        { "gcs_msg.xcom_member_state.group_id", "mgr.gcs_msg.xcom_member_state.group_id",
+        FT_UINT32, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_xcom_member_state_msg_no,
+        { "gcs_msg.xcom_member_state.msg_no", "mgr.gcs_msg.xcom_member_state.msg_no",
+        FT_UINT64, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_xcom_member_state_node,
+        { "gcs_msg.xcom_member_state.node", "mgr.gcs_msg.xcom_member_state.node",
+        FT_UINT32, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_xcom_member_state_payload_cargo_type,
+        { "gcs_msg.xcom_member_state.payload.cargo_type", "mgr.gcs_msg.xcom_member_state.payload.cargo_type",
+        FT_UINT32, BASE_DEC,
+        VALS(plugin_gcs_message_cargo_type_names), 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_member_count,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.member_count", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.member_count",
+        FT_UINT16, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_hostname,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.hostname", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.hostname",
+        FT_STRING, BASE_NONE,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_port,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.port", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.port",
+        FT_UINT16, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_uuid,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.uuid", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.uuid",
+        FT_STRING, BASE_NONE,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_gcs_member_id,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.gcs_member_id", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.gcs_member_id",
+        FT_STRING, BASE_NONE,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_status,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.status", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.status",
+        FT_UINT8, BASE_DEC,
+        VALS(plugin_gcs_message_member_status_names), 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_member_version,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.member_version", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.member_version",
+        FT_UINT32, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_write_set_extraction_algorithm,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.write_set_extraction_algorithm", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.write_set_extraction_algorithm",
+        FT_UINT8, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_executed_gtid_set,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.executed_gtid_set", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.executed_gtid_set",
+        FT_STRING, BASE_NONE,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_retrieved_gtid_set,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.retrieved_gtid_set", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.retrieved_gtid_set",
+        FT_STRING, BASE_NONE,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_gtid_assignment_block_size,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.gtid_assignment_block_size", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.gtid_assignment_block_size",
+        FT_UINT64, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_role,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.role", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.role",
+        FT_UINT8, BASE_DEC,
+        VALS(plugin_gcs_message_member_role_names), 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_configuration_flags,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.configuration_flags", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.configuration_flags",
+        FT_UINT32, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_conflict_detection_enable,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.conflict_detection_enable", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.conflict_detection_enable",
+        FT_STRING, BASE_NONE,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
+    { &hf_group_member_info_member_weight,
+        { "gcs_msg.xcom_member_state.payload.group_member_info.member_weight", "mgr.gcs_msg.xcom_member_state.payload.group_member_info.member_weight",
+        FT_UINT16, BASE_DEC,
+        NULL, 0x0,
+        NULL, HFILL }
+    },
 };

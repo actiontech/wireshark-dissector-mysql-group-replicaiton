@@ -6,6 +6,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+#include <stdio.h>
 #include "config.h"
 #include <epan/packet.h>
 #include <epan/dissectors/packet-tcp.h>
@@ -129,6 +130,177 @@ decode_uncommitted_list(tvbuff_t *tvb, int offset, proto_tree *pt,
     return offset;
 }
 
+static int decode_gcs_plugin_msg_payload_item_type_and_length(tvbuff_t *tvb, int offset, guint32* type, guint64* length)
+{
+    if (type != NULL)
+    {
+        *type = tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN);
+    }
+    offset += 2;
+
+    if (length != NULL) {
+        *length = tvb_get_guint64(tvb, offset, ENC_LITTLE_ENDIAN);
+    }
+    offset += 8;
+
+    return offset;
+}
+
+static int decode_gcs_plugin_msg_decode_payload_item(tvbuff_t *tvb, int offset, proto_tree *pt, int _hf)
+{
+    guint64 length;
+    offset = decode_gcs_plugin_msg_payload_item_type_and_length(tvb, offset, NULL, &length);
+    
+    int length_int = (int)length; //FIXME
+    proto_tree_add_item(pt, _hf, tvb, offset, length_int, ENC_LITTLE_ENDIAN);
+    offset += length;
+
+    return offset;
+}
+
+static int decode_plugin_gcs_message_header(tvbuff_t *tvb, int offset, guint16* cargo_type)
+{
+    //version
+    offset += 4;
+
+    //fixed_header_len
+    offset += 2;
+
+    //msg_len
+    offset += 8;
+
+    //cargo_type
+    if (cargo_type != NULL) {
+        *cargo_type = tvb_get_guint16(tvb, offset, ENC_LITTLE_ENDIAN);
+    }
+    offset += 2;
+
+    return offset;
+}
+
+static int
+decode_gcs_msg(tvbuff_t *tvb, int offset, proto_tree *pt)
+{
+    uint len = tvb_get_guint32(tvb, offset, ENC_BIG_ENDIAN);
+    offset += 4;
+
+    if (len % BYTES_PER_XDR_UNIT > 0)
+    {
+        len += (BYTES_PER_XDR_UNIT - len % BYTES_PER_XDR_UNIT);
+    }
+    int end_offset = offset + len;
+
+    proto_tree *sub_tree = proto_tree_add_subtree_format(pt, tvb, offset, len, ett_gcs_msg, NULL, "gcs_msg");
+    proto_tree_add_item(sub_tree, hf_gcs_msg_version, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    /* int fixed_header_len = */ tvb_get_gint16(tvb, offset, ENC_LITTLE_ENDIAN);
+    offset += 2;
+
+    /* int msg_len = */ tvb_get_gint64(tvb, offset, ENC_LITTLE_ENDIAN);
+    offset += 8;
+
+    int dynamic_headers_len = tvb_get_gint32(tvb, offset, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    guint32 cargo_type;
+    proto_tree_add_item_ret_uint(sub_tree, hf_gcs_msg_cargo_type, tvb, offset, 2, ENC_LITTLE_ENDIAN, &cargo_type);
+    offset += 2;
+
+    if (dynamic_headers_len > 0)
+    {
+        //TODO
+        proto_tree_add_uint(sub_tree, hf_TODO, tvb, offset, 0, 1);
+        return end_offset;
+    }
+
+    if (cargo_type == 1 /* CT_INTERNAL_STATE_EXCHANGE */)
+    {
+        guint32 wire_header_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        /* int WIRE_PAYLOAD_LEN_SIZE = */ tvb_get_gint64(tvb, offset, ENC_LITTLE_ENDIAN);
+        offset += 8;
+
+        offset += wire_header_len;
+
+        proto_tree_add_item(sub_tree, hf_xcom_member_state_fixed_view_id, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+        offset += 8;
+
+        proto_tree_add_item(sub_tree, hf_xcom_member_state_monotonic_view_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_tree_add_item(sub_tree, hf_xcom_member_state_group_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        proto_tree_add_item(sub_tree, hf_xcom_member_state_msg_no, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+        offset += 8;
+
+        proto_tree_add_item(sub_tree, hf_xcom_member_state_node, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        //Gcs_message_data.header_len
+        wire_header_len = tvb_get_guint32(tvb, offset, ENC_LITTLE_ENDIAN);
+        offset += 4;
+
+        //Gcs_message_data.payload_len
+        offset += 8;
+
+        offset += wire_header_len;
+
+        guint16 plugin_gcs_cargo_type;
+        offset = decode_plugin_gcs_message_header(tvb, offset, &plugin_gcs_cargo_type);
+        proto_tree_add_uint(sub_tree, hf_xcom_member_state_payload_cargo_type, tvb, offset, 2, plugin_gcs_cargo_type);
+
+        //Group_member_info_manager_message.number_of_members.payload.type/length
+        offset = decode_gcs_plugin_msg_payload_item_type_and_length(tvb, offset, NULL, NULL);
+        
+        int member_count;
+        proto_tree_add_item_ret_uint(sub_tree, hf_group_member_info_member_count, tvb, offset, 2, ENC_LITTLE_ENDIAN, &member_count);
+        offset += 2;
+
+        for (int i = 0; i < member_count; ++i)
+        {
+            offset = decode_plugin_gcs_message_header(tvb, offset, NULL);
+
+            //Group_member_info_manager_message.members.payload.type/length
+            offset = decode_gcs_plugin_msg_payload_item_type_and_length(tvb, offset, NULL, NULL);
+
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_hostname);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_port);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_uuid);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_gcs_member_id);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_status);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_member_version);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_write_set_extraction_algorithm);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_executed_gtid_set);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_retrieved_gtid_set);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_gtid_assignment_block_size);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_role);
+            offset = decode_gcs_plugin_msg_decode_payload_item(tvb, offset, sub_tree, hf_group_member_info_configuration_flags);
+
+            while (offset + 10 /* WIRE_PAYLOAD_ITEM_HEADER_SIZE */ < end_offset)
+            {
+                int payload_type;
+                offset = decode_gcs_plugin_msg_payload_item_type_and_length(tvb, offset, &payload_type, NULL);
+
+                switch (payload_type) 
+                {
+                case 13 /* PIT_CONFLICT_DETECTION_ENABLE */:
+                    proto_tree_add_item(sub_tree, hf_group_member_info_conflict_detection_enable, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+                    break;
+                case 14 /* PIT_MEMBER_WEIGHT */:
+                    proto_tree_add_item(sub_tree, hf_group_member_info_member_weight, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+                    break;
+                }
+            }
+        }
+    }
+
+
+    return end_offset;
+}
+
 static int
 decode_app_data_body(tvbuff_t *tvb, int offset, proto_tree *pt)
 {
@@ -170,7 +342,7 @@ decode_app_data_body(tvbuff_t *tvb, int offset, proto_tree *pt)
 
             break;
         case 4 /* app_type */:
-            offset = decode_bytes(tvb, offset, pt, hf_app_data_data);
+            offset = decode_gcs_msg(tvb, offset, pt);
             break;
         case 5 /* query_type */:
         case 6 /* query_next_log */:
